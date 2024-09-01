@@ -25,6 +25,11 @@ while (count > 0) {
 	}
 }
 """
+num_events = 100000
+arrival_interval = (2.0, 5.0)
+service_interval = (3.0, 5.0)
+max_queue_length = 5
+
 
 def simulate_queue():
     global_time = 0
