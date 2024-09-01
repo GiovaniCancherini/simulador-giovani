@@ -57,13 +57,17 @@ def simulate_queue(num_events, arrival_interval, service_interval, max_queue_len
             num_events -= 1
             
             # Tratamento do evento de saída
-            queue.pop(0)
             if len(queue) > 0:
-                # Próximo cliente começa a ser atendido
-                service_time = next_random() * (service_interval[1] - service_interval[0]) + service_interval[0]
-                next_departure[next_server] = global_time + service_time
+                queue.pop(0)
+                if len(queue) > 0:
+                    # Próximo cliente começa a ser atendido
+                    service_time = next_random() * (service_interval[1] - service_interval[0]) + service_interval[0]
+                    next_departure[next_server] = global_time + service_time
+                else:
+                    # Se a fila estiver vazia, o servidor fica ocioso
+                    next_departure[next_server] = float('inf')
             else:
-                # Se a fila estiver vazia, o servidor fica ocioso
+                # Se não há clientes na fila, definir a próxima saída como infinita
                 next_departure[next_server] = float('inf')
         
         # Atualizar tempos acumulados para cada estado da fila
@@ -89,4 +93,13 @@ print("# Tempos acumulados por estado:", times)
 print("# Probabilidades dos estados:", probabilities)
 print("# Clientes perdidos:", lost_customers)
 print("# Tempo total de simulação:", global_time)
-print("#######################################################################################\n")
+print("#")
+
+# Simulação G/G/2/5
+print("# FILA G/G/2/5:")
+times, probabilities, lost_customers, global_time = simulate_queue(num_events, arrival_interval, service_interval, max_queue_length, 2)
+print("# Tempos acumulados por estado:", times)
+print("# Probabilidades dos estados:", probabilities)
+print("# Clientes perdidos:", lost_customers)
+print("# Tempo total de simulação:", global_time)
+print("#######################################################################################")
