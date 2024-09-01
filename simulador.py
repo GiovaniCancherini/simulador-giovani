@@ -9,4 +9,4 @@ def next_random():
     return seed / M
 
 random_numbers = [next_random() for _ in range(10)]
-print(random_numbers)
+# print(random_numbers)
