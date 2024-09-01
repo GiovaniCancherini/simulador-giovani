@@ -33,4 +33,17 @@ max_queue_length = 5
 
 def simulate_queue():
     global_time = 0
+    next_arrival = 2.0  # Primeiro cliente chega no tempo 2.0
+    next_departure = 0
+    queue = []
+    events = []
+    accumulated_times = [0] * (max_queue_length + 1)  # Tempos acumulados para cada estado da fila
     
+    while num_events > 0:
+        if next_arrival < next_departure:
+           # Chegada 
+        else:
+            # Atendimento
+    return 0
+    
+global_time = simulate_queue()
