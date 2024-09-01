@@ -30,11 +30,11 @@ def simulate_queue(num_events, arrival_interval, service_interval, max_queue_len
     next_arrival = 2.0  # Primeiro cliente chega no tempo 2.0
     next_departure = 0
     queue = []
-    events = []  
+    events = []
     lost_customers = 0 
+    accumulated_times = [0] * (max_queue_length + 1)
     
     while num_events > 0:
-        # Determina o próximo evento
         if next_arrival < next_departure:
             global_time = next_arrival
             events.append((global_time, 'arrival'))
@@ -42,7 +42,9 @@ def simulate_queue(num_events, arrival_interval, service_interval, max_queue_len
             
             if len(queue) < max_queue_length:
                 queue.append(global_time)
-                
+                if len(queue) == 1:
+                    service_time = next_random() * (service_interval[1] - service_interval[0]) + service_interval[0]
+                    next_departure = global_time + service_time
             else:
                 lost_customers += 1
             
@@ -60,17 +62,23 @@ def simulate_queue(num_events, arrival_interval, service_interval, max_queue_len
             else:
                 next_departure = float('inf')
         
-        
-    # Calcular probabilidades dos estados da fila
+        if len(queue) <= max_queue_length:
+            accumulated_times[len(queue)] += global_time - events[-2][0] if len(events) > 1 else global_time
+    
+    total_time = sum(accumulated_times)
+    probabilities = [t / total_time for t in accumulated_times]
     
     return global_time
 
 # Parâmetros de entrada
-num_events = 10
+num_events = 100
 arrival_interval = (2.0, 5.0)
 service_interval = (3.0, 5.0)
 max_queue_length = 5
 
+# Executar a simulação
 global_time = simulate_queue(num_events, arrival_interval, service_interval, max_queue_length)
 
+# Resultados
 print("Tempo total de simulação:", global_time)
+
