@@ -9,4 +9,23 @@ def next_random():
     return seed / M
 
 random_numbers = [next_random() for _ in range(10)]
-# print(random_numbers)
+
+"""
+- /G/1/5, chegadas entre 2...5, atendimento entre 3...5;
+- G/G/2/5, chegadas entre 2...5, atendimento entre 3…5.
+
+int count = 100000;
+...
+while (count > 0) {
+	evento = NextEvent();
+	if (evento == tipo_chegada) {
+		CHEGADA (evento);
+	} else if (evento == tipo_saida) {
+		SAIDA (evento);
+	}
+}
+"""
+
+def simulate_queue():
+    global_time = 0
+    
