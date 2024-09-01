@@ -28,12 +28,14 @@ while (count > 0) {
 def simulate_queue(num_events, arrival_interval, service_interval, max_queue_length):
     global_time = 0
     next_arrival = 2.0  # Primeiro cliente chega no tempo 2.0
-    next_departure = 0
+    next_departure = float('inf')
     queue = []
     events = []
+    lost_customers = 0
     accumulated_times = [0] * (max_queue_length + 1)  
     
     while num_events > 0:
+        # Determina o próximo evento
         if next_arrival < next_departure:
             global_time = next_arrival
             events.append((global_time, 'arrival'))
@@ -44,8 +46,9 @@ def simulate_queue(num_events, arrival_interval, service_interval, max_queue_len
                 if len(queue) == 1:
                     service_time = next_random() * (service_interval[1] - service_interval[0]) + service_interval[0]
                     next_departure = global_time + service_time
+            else:
+                lost_customers += 1
             
-                
             interarrival_time = next_random() * (arrival_interval[1] - arrival_interval[0]) + arrival_interval[0]
             next_arrival = global_time + interarrival_time
             
@@ -54,6 +57,7 @@ def simulate_queue(num_events, arrival_interval, service_interval, max_queue_len
             events.append((global_time, 'departure'))
             num_events -= 1
             
+            queue.pop(0)
             if len(queue) > 0:
                 service_time = next_random() * (service_interval[1] - service_interval[0]) + service_interval[0]
                 next_departure = global_time + service_time
@@ -66,16 +70,16 @@ def simulate_queue(num_events, arrival_interval, service_interval, max_queue_len
     total_time = sum(accumulated_times)
     probabilities = [t / total_time for t in accumulated_times]
     
-    return accumulated_times, probabilities, global_time
+    return accumulated_times, probabilities, lost_customers, global_time
 
 num_events = 100000
 arrival_interval = (2.0, 5.0)
 service_interval = (3.0, 5.0)
 max_queue_length = 5
 
-times, probabilities, global_time = simulate_queue(num_events, arrival_interval, service_interval, max_queue_length)
+times, probabilities, lost_customers, global_time = simulate_queue(num_events, arrival_interval, service_interval, max_queue_length)
 
 print("Tempos acumulados por estado:", times)
 print("Probabilidades dos estados:", probabilities)
+print("Clientes perdidos:", lost_customers)
 print("Tempo total de simulação:", global_time)
-
