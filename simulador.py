@@ -21,6 +21,12 @@ def simulate_tandem_queues(num_events, arrival_interval, service_interval1, serv
     
     # Inicializa o primeiro evento de chegada
     escalonador.add_event(Evento("arrival", global_time))
+    events = []
+    
+    # Contadores para chegadas e atendimentos
+    num_chegadas_1_4 = 0
+    num_atendimentos_3_4 = 0
+    num_atendimentos_2_3 = 0
     
     while num_events > 0:
         current_event = escalonador.get_next_event()
@@ -31,15 +37,20 @@ def simulate_tandem_queues(num_events, arrival_interval, service_interval1, serv
         
         if current_event.tipo == "arrival":
             chegada_fila1(queue1, escalonador, global_time, arrival_interval)
+            num_chegadas_1_4 += 1
         
         elif current_event.tipo == "departure":
             saida_fila1(queue1, queue2, escalonador, global_time, service_interval1)
+            if service_interval1[0] <= 3 and service_interval1[1] <= 4:
+                num_atendimentos_3_4 += 1
         
         elif current_event.tipo == "passage":
             passagem_fila1_fila2(queue1, queue2, escalonador, global_time, service_interval2)
+            if service_interval2[0] <= 2 and service_interval2[1] <= 3:
+                num_atendimentos_2_3 += 1
     
-    # Retornar dados de simulação
-    return queue1.accumulated_times, queue2.accumulated_times, queue1.loss, queue2.loss, global_time
+    # Retornar dados de simulação e contadores de chegadas/atendimentos
+    return queue1.accumulated_times, queue2.accumulated_times, queue1.loss, queue2.loss, global_time, num_chegadas_1_4, num_atendimentos_3_4, num_atendimentos_2_3
 
 def chegada_fila1(queue1, escalonador, global_time, arrival_interval):
     if queue1.status() < queue1.get_capacity():
