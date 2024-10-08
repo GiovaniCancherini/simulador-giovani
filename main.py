@@ -1,50 +1,28 @@
-from simulador import simulate_tandem_queues
+from simulador import Simulador
 
-# Parâmetros de entrada para a primeira simulação (G/G/2/3)
-num_events = 100000
-arrival_interval_gg23 = (1.0, 4.0)
-service_interval1_gg23 = (3.0, 4.0)
-service_interval2_gg23 = (3.0, 4.0)
-max_queue_length1_gg23 = 3
-max_queue_length2_gg23 = 3
-num_servers1_gg23 = 2
-num_servers2_gg23 = 2
+def print_results(results):
+    print(f"Tempo global de simulação: {results['global_time']:.2f}")
+    print(f"Números aleatórios utilizados: {results['random_numbers_used']}")
+    print("\nResultados por fila:")
+    for queue_name, queue_results in results['queues'].items():
+        print(f"\nFila {queue_name}:")
+        print(f"  Clientes perdidos: {queue_results['lost_customers']}")
+        
+        # Calcula as probabilidades de estado
+        total_time = sum(queue_results['accumulated_times'])
+        
+        print(f"  Probabilidades de estado:")
+        if total_time > 0:
+            probabilities = [time/total_time for time in queue_results['accumulated_times']]
+            for i, prob in enumerate(probabilities):
+                print(f"    Estado {i}: {prob:.4f}")
+        else:
+            print("    Não há dados suficientes para calcular probabilidades (tempo total é zero)")
 
-# Parâmetros de entrada para a segunda simulação (G/G/1/5)
-service_interval1_gg15 = (2.0, 3.0)
-service_interval2_gg15 = (2.0, 3.0)
-max_queue_length1_gg15 = 5
-max_queue_length2_gg15 = 5
-num_servers1_gg15 = 1
-num_servers2_gg15 = 1
+def main():
+    simulador = Simulador("model.yaml")
+    results = simulador.simulate(100000)  # Vai usar 100000 números aleatórios
+    print_results(results)
 
-print("#######################################################################################")
-
-# Simulação G/G/2/3, chegadas entre 1..4, atendimento entre 3..4
-print("___Simulação G/G/2/3, chegadas entre 1..4, atendimento entre 3..4:")
-times1_gg23, times2_gg23, lost_customers1_gg23, lost_customers2_gg23, global_time_gg23, num_chegadas_1_4, num_atendimentos_3_4, _ = simulate_tandem_queues(
-    num_events, arrival_interval_gg23, service_interval1_gg23, service_interval2_gg23,
-    max_queue_length1_gg23, max_queue_length2_gg23, num_servers1_gg23, num_servers2_gg23
-)
-print("Tempos acumulados por estado - Fila 1:", times1_gg23)
-print("Tempos acumulados por estado - Fila 2:", times2_gg23)
-print("Clientes perdidos na Fila 1:", lost_customers1_gg23)
-print("Clientes perdidos na Fila 2:", lost_customers2_gg23)
-print("Número de chegadas entre 1..4:", num_chegadas_1_4)
-print("Número de atendimentos entre 3..4:", num_atendimentos_3_4)
-print("Tempo global de simulação:", global_time_gg23)
-print("#######################################################################################")
-
-# Simulação G/G/1/5, chegadas entre 1..4, atendimento entre 2..3
-print("___Simulação G/G/1/5, chegadas entre 1..4, atendimento entre 2..3:")
-times1_gg15, times2_gg15, lost_customers1_gg15, lost_customers2_gg15, global_time_gg15, _, _, num_atendimentos_2_3 = simulate_tandem_queues(
-    num_events, arrival_interval_gg23, service_interval1_gg15, service_interval2_gg15,
-    max_queue_length1_gg15, max_queue_length2_gg15, num_servers1_gg15, num_servers2_gg15
-)
-print("Tempos acumulados por estado - Fila 1:", times1_gg15)
-print("Tempos acumulados por estado - Fila 2:", times2_gg15)
-print("Clientes perdidos na Fila 1:", lost_customers1_gg15)
-print("Clientes perdidos na Fila 2:", lost_customers2_gg15)
-print("Número de atendimentos entre 2..3:", num_atendimentos_2_3)
-print("Tempo global de simulação:", global_time_gg15)
-print("#######################################################################################")
+if __name__ == "__main__":
+    main()
