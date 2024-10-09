@@ -16,6 +16,7 @@ class Simulador:
         self.queues = {}
         self.escalonador = Escalonador()
         self.global_time = 0
+        self.last_event_time = 0  # Initialize last_event_time here
         self.random_count = 0
         self.random_numbers = self.loader.random_numbers[0]  # Usar números fornecidos
         self.current_random_index = 0
@@ -149,6 +150,7 @@ class Simulador:
         return queue.min_arrival + rnd * (queue.max_arrival - queue.min_arrival)
     
     def _get_results(self) -> dict:
+        # Atualizar para incluir mais detalhes nos resultados
         results = {
             "global_time": self.global_time,
             "random_numbers_used": self.random_count,
@@ -157,17 +159,13 @@ class Simulador:
         
         for name, queue in self.queues.items():
             total_time = sum(queue.accumulated_times)
+            probabilities = [time/total_time for time in queue.accumulated_times] if total_time > 0 else [0] * len(queue.accumulated_times)
+            
             results["queues"][name] = {
                 "lost_customers": queue.loss,
                 "accumulated_times": queue.accumulated_times,
-                "state_probabilities": [
-                    time/total_time if total_time > 0 else 0 
-                    for time in queue.accumulated_times
-                ],
-                "routes": queue.routes,
-                "average_queue_length": sum(
-                    i * time for i, time in enumerate(queue.accumulated_times)
-                ) / total_time if total_time > 0 else 0
+                "state_probabilities": probabilities,
+                "routes": queue.routes
             }
         
         return results
