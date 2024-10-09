@@ -11,7 +11,8 @@ def print_results(results):
         
         print(f"  Probabilidades de estado:")
         for i, prob in enumerate(queue_results['state_probabilities']):
-            print(f"    Estado {i}: {prob:.4f}")
+            if prob > 0.0001:  # non-zero probabilities
+                print(f"    Estado {i}: {prob:.4f}")
         
         print(f"  Rotas:")
         for target, prob in queue_results['routes'].items():
@@ -19,7 +20,7 @@ def print_results(results):
 
 def main():
     simulador = Simulador("model.yaml")
-    results = simulador.simulate(100000)  # Vai usar 100000 números aleatórios
+    results = simulador.simulate(100000)
     print_results(results)
 
 if __name__ == "__main__":
