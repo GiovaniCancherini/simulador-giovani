@@ -41,7 +41,7 @@ network:
     probability: 0.3
 
 rndnumbers:
-  # Aqui você colocaria seus 100.000 números aleatórios
+  # Aqui se coloca os 100.000 números aleatórios
   - 0.2176
   - 0.0103
-  # ... mais números ...
+  

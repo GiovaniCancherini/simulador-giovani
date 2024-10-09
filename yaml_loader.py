@@ -33,6 +33,7 @@ class YAMLLoader:
     def _parse_queues(self) -> Dict[str, QueueConfig]:
         queues = {}
         for name, config in self.config.get('queues', {}).items():
+            # Adicionar validação para garantir que a soma das probabilidades é 1
             queues[name] = QueueConfig(
                 servers=config['servers'],
                 min_service=config['minService'],
@@ -42,6 +43,18 @@ class YAMLLoader:
                 max_arrival=config.get('maxArrival', 0)
             )
         return queues
+    
+    def validate_network(self):
+        # Adicionar método para validar que a soma das probabilidades para cada fila é 1
+        probabilities = {}
+        for route in self.network:
+            if route.source not in probabilities:
+                probabilities[route.source] = 0
+            probabilities[route.source] += route.probability
+        
+        for source, total_prob in probabilities.items():
+            if abs(total_prob - 1.0) > 0.0001:
+                raise ValueError(f"Probabilidades para a fila {source} somam {total_prob}, deveria ser 1.0")
     
     def _parse_network(self) -> List[NetworkRoute]:
         return [NetworkRoute(**route) for route in self.config.get('network', [])]

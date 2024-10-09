@@ -9,3 +9,9 @@ class Escalonador:
     
     def get_next_event(self):
         return heapq.heappop(self.event_queue) if self.event_queue else None
+    
+    def peek_next_event(self):
+        return self.event_queue[0] if self.event_queue else None
+    
+    def is_empty(self):
+        return len(self.event_queue) == 0

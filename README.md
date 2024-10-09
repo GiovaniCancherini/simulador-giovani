@@ -5,6 +5,5 @@
 
 ```
 pip install pyyaml
-pip install yml
 
 ```

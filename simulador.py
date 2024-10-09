@@ -12,18 +12,28 @@ class Simulador:
 
     def __init__(self, yaml_file: str):
         self.loader = YAMLLoader(yaml_file)
+        self.loader.validate_network()  # Validar rede antes de iniciar
         self.queues = {}
         self.escalonador = Escalonador()
         self.global_time = 0
         self.random_count = 0
+        self.random_numbers = self.loader.random_numbers[0]  # Usar números fornecidos
+        self.current_random_index = 0
         
         self._setup_queues()
         self._setup_network()
     
     def next_random(self):
-        self.seed = (self.a * self.seed + self.c) % self.M
+        # Usar números aleatórios fornecidos ou gerar novos
+        if self.current_random_index < len(self.random_numbers):
+            value = self.random_numbers[self.current_random_index]
+            self.current_random_index += 1
+        else:
+            self.seed = (self.a * self.seed + self.c) % self.M
+            value = self.seed / self.M
+        
         self.random_count += 1
-        return self.seed / self.M
+        return value
     
     def _setup_queues(self):
         for name, config in self.loader.queues.items():
@@ -58,6 +68,12 @@ class Simulador:
         return self._get_results()
     
     def _process_event(self, event: Evento):
+        # Atualizar tempos acumulados para todas as filas
+        time_increment = event.tempo - self.last_event_time
+        for queue in self.queues.values():
+            queue.accumulate_time(time_increment)
+        self.last_event_time = event.tempo
+
         if event.tipo == "arrival":
             self._handle_arrival(event)
         elif event.tipo == "departure":
@@ -87,29 +103,42 @@ class Simulador:
         origin_queue = self.queues[event.origem]
         origin_queue.end_service()
         
-        # Determine next queue
-        next_queue = origin_queue.get_route(self.next_random())
+        # Determinar próxima fila
+        next_queue_name = origin_queue.get_route(self.next_random())
         
-        if next_queue != "exit" and next_queue in self.queues:
-            target_queue = self.queues[next_queue]
-            if target_queue.can_accept():
-                target_queue.in_queue()
-                if target_queue.can_serve():
-                    target_queue.start_service()
-                    service_time = self._get_service_time(target_queue)
-                    self.escalonador.add_event(
-                        Evento("departure", self.global_time + service_time, origem=next_queue)
-                    )
-            else:
-                target_queue.add_loss()
+        if next_queue_name != "exit":
+            # Criar evento de passagem
+            passage_event = Evento(
+                tipo="passage",
+                tempo=self.global_time,
+                origem=event.origem,
+                destino=next_queue_name
+            )
+            self._handle_passage(passage_event)
         
-        # If there are customers waiting and servers available, start new service
+        # Se há clientes esperando e servidores disponíveis, iniciar novo serviço
         if origin_queue.can_serve():
             origin_queue.start_service()
             service_time = self._get_service_time(origin_queue)
             self.escalonador.add_event(
                 Evento("departure", self.global_time + service_time, origem=event.origem)
             )
+            
+    def _handle_passage(self, event: Evento):
+        if event.destino not in self.queues:
+            return  # Cliente saiu do sistema
+        
+        target_queue = self.queues[event.destino]
+        if target_queue.can_accept():
+            target_queue.in_queue()
+            if target_queue.can_serve():
+                target_queue.start_service()
+                service_time = self._get_service_time(target_queue)
+                self.escalonador.add_event(
+                    Evento("departure", self.global_time + service_time, origem=event.destino)
+                )
+        else:
+            target_queue.add_loss()
     
     def _get_service_time(self, queue: Fila) -> float:
         rnd = self.next_random()
@@ -127,9 +156,32 @@ class Simulador:
         }
         
         for name, queue in self.queues.items():
+            total_time = sum(queue.accumulated_times)
             results["queues"][name] = {
                 "lost_customers": queue.loss,
-                "accumulated_times": queue.accumulated_times
+                "accumulated_times": queue.accumulated_times,
+                "state_probabilities": [
+                    time/total_time if total_time > 0 else 0 
+                    for time in queue.accumulated_times
+                ],
+                "routes": queue.routes,
+                "average_queue_length": sum(
+                    i * time for i, time in enumerate(queue.accumulated_times)
+                ) / total_time if total_time > 0 else 0
             }
         
         return results
+    
+    def _validate_model(self):
+        # Verificar se todas as filas referenciadas existem
+        for route in self.loader.network:
+            if route.source not in self.queues and route.source != "exit":
+                raise ValueError(f"Fila de origem inválida: {route.source}")
+            if route.target not in self.queues and route.target != "exit":
+                raise ValueError(f"Fila de destino inválida: {route.target}")
+        
+        # Verificar se todas as filas têm rotas definidas
+        for queue_name in self.queues:
+            total_prob = sum(route.probability for route in self.loader.network if route.source == queue_name)
+            if abs(total_prob - 1.0) > 0.0001:
+                raise ValueError(f"Soma das probabilidades para a fila {queue_name} é {total_prob}, deveria ser 1.0")
