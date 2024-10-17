@@ -1,178 +1,147 @@
-from yaml_loader import YAMLLoader
+import yaml
 from fila import Fila
 from evento import Evento
-from escalonador import Escalonador
 
 class Simulador:
-    # Parâmetros globais do gerador de números aleatórios
-    a = 1664525
-    c = 1013904223
-    M = 2**32
-    seed = 12345
-
-    def __init__(self, yaml_file: str):
-        self.loader = YAMLLoader(yaml_file)
-        self.loader.validate_network()
+    def __init__(self, config_file, seed):
+        self.global_time = 0
+        self.iterations = 100000
+        self.scheduler = []
+        self.seed = seed
         self.queues = {}
-        self.escalonador = Escalonador()
-        self.global_time = 0.0
-        self.last_event_time = 0.0
-        self.random_count = 0
-        self.random_numbers = self.loader.random_numbers
-        self.current_random_index = 0
-        
-        self._setup_queues()
-        self._setup_network()
-    
-    def next_random(self):
-        if self.current_random_index < len(self.random_numbers):
-            value = self.random_numbers[self.current_random_index]
-        else:
-            # Gerador congruencial linear
-            self.seed = (self.a * self.seed + self.c) % self.M
-            value = self.seed / self.M
-        
-        self.current_random_index += 1
-        self.random_count += 1
-        return value
-    
-    def _setup_queues(self):
-        for name, config in self.loader.queues.items():
-            self.queues[name] = Fila(
-                name=name,
-                num_servers=config.servers,
-                capacity=config.capacity,
-                min_service=config.min_service,
-                max_service=config.max_service
-            )
-    
-    def _setup_network(self):
-        for route in self.loader.network:
-            if route.source in self.queues:
-                self.queues[route.source].add_route(route.target, route.probability)
-    
-    def simulate(self, num_events: int):
-        # schedule initial arrivals
-        for queue_name, arrival_time in self.loader.arrivals.items():
-            self.escalonador.add_event(Evento("arrival", arrival_time, destino=queue_name))
-        
-        while self.random_count < num_events: # TODO: PROBLEMA AQUI, LOOP INFINITO
-            event = self.escalonador.get_next_event()
-            if not event:
-                break
-            
-            self.global_time = event.tempo
-            self._process_event(event) # AQUI DEVERIA ACABAR ATUALIZANDO O self.random_count
-        
-        return self._get_results()
-    
-    def _process_event(self, event: Evento):
-        time_increment = event.tempo - self.last_event_time
-        for queue in self.queues.values():
-            queue.accumulate_time(time_increment)
-        self.last_event_time = event.tempo
+        self.load_config(config_file)
 
-        if event.tipo == "arrival":
-            self._handle_arrival(event)
-        elif event.tipo == "departure":
-            self._handle_departure(event)
-    
-    def _handle_arrival(self, event: Evento):
-        queue = self.queues[event.destino]
-        accepted = queue.try_accept_customer()
-        
-        if accepted:
-            if queue.can_serve():
-                service_time = self._get_service_time(queue)
-                self.escalonador.add_event(
-                    Evento("departure", self.global_time + service_time, origem=event.destino)
-                )
-        
-        # Schedule next arrival for Q1 only
-        if event.destino == "Q1":
-            next_arrival = self.loader.arrivals["Q1"]
-            self.escalonador.add_event(
-                Evento("arrival", self.global_time + next_arrival, destino="Q1")
+    def load_config(self, config_file):
+        with open(config_file, 'r') as file:
+            config = yaml.safe_load(file)
+
+        for queue_name, queue_config in config['queues'].items():
+            queue = Fila(
+                name=queue_name,
+                min_service=queue_config['service_time'][0],
+                max_service=queue_config['service_time'][1],
+                num_servers=queue_config['servers'],
+                capacity=queue_config['capacity']
             )
-    
-    def _handle_departure(self, event: Evento):
-        origin_queue = self.queues[event.origem]
-        origin_queue.complete_service()
-        
-        next_queue = self._get_next_queue(origin_queue)
-        
-        if next_queue != "exit":
-            arrival_event = Evento("arrival", self.global_time, destino=next_queue)
-            self._handle_arrival(arrival_event)
-        
-        if origin_queue.can_serve():
-            service_time = self._get_service_time(origin_queue)
-            self.escalonador.add_event(
-                Evento("departure", self.global_time + service_time, origem=event.origem)
-            )
-            
-    def _handle_passage(self, event: Evento):
-        if event.destino not in self.queues:
-            return  # Cliente saiu do sistema
-        
-        target_queue = self.queues[event.destino]
-        if target_queue.can_accept():
-            target_queue.in_queue()
-            if target_queue.can_serve():
-                target_queue.start_service()
-                service_time = self._get_service_time(target_queue)
-                self.escalonador.add_event(
-                    Evento("departure", self.global_time + service_time, origem=event.destino)
-                )
-        else:
-            target_queue.add_loss()
-    
-    def _get_next_queue(self, queue: Fila) -> str:
+            self.queues[queue_name] = queue
+
+        for queue_name, queue_config in config['queues'].items():
+            for dest, prob in queue_config['transitions'].items():
+                self.queues[queue_name].transitions[dest] = prob
+
+        self.initial_queue = config['initial_queue']
+        self.initial_arrival_time = config['initial_arrival_time']
+        self.min_arrival = config['arrival_time'][0]
+        self.max_arrival = config['arrival_time'][1]
+
+    def next_random(self):
+        self.iterations -= 1
+        a, M, c = 1103515245, 2**31, 12345
+        self.seed = (a * self.seed + c) % M
+        return self.seed / M
+
+    def random_between(self, a, b):
+        return a + (b - a) * self.next_random()
+
+    def insert_event(self, event):
+        for i, scheduled_event in enumerate(self.scheduler):
+            if scheduled_event.time > event.time:
+                self.scheduler.insert(i, event)
+                return
+        self.scheduler.append(event)
+
+    def update_queues_time(self, time):
+        for queue in self.queues.values():
+            queue.times[queue.population] += (time - self.global_time)
+        self.global_time = time
+
+    def choose_next_queue(self, current_queue):
         rand = self.next_random()
-        cumulative = 0.0
-        for target, probability in queue.routes.items():
-            cumulative += probability
-            if rand < cumulative:
-                return target
-        return list(queue.routes.keys())[-1]  # Fallback to last route
-    
-    def _get_service_time(self, queue: Fila) -> float:
-        rnd = self.next_random()
-        return queue.min_service + rnd * (queue.max_service - queue.min_service)
-    
-    def _get_arrival_time(self, queue: Fila) -> float:
-        rnd = self.next_random()
-        return queue.min_arrival + rnd * (queue.max_arrival - queue.min_arrival)
-    
-    def _get_results(self) -> dict:
-        results = {
-            "global_time": self.global_time,
-            "random_numbers_used": self.random_count,
-            "queues": {}
-        }
+        cumulative_prob = 0
+        for dest, prob in current_queue.transitions.items():
+            cumulative_prob += prob
+            if rand < cumulative_prob:
+                return dest
+        return 'exit'
+
+    def schedule_service(self, queue_name):
+        queue = self.queues[queue_name]
+        service_time = self.random_between(queue.min_service, queue.max_service)
+        next_queue = self.choose_next_queue(queue)
         
-        for name, queue in self.queues.items():
-            total_time = sum(queue.accumulated_times)
-            probabilities = [time/total_time for time in queue.accumulated_times] if total_time > 0 else [0] * (queue.capacity + 1)
-            
-            results["queues"][name] = {
-                "lost_customers": queue.losses,
-                "state_probabilities": probabilities,
-                "routes": queue.routes
-            }
+        if next_queue == 'exit':
+            event = Evento('exit', self.global_time + service_time, queue_source=queue_name)
+        else:
+            event = Evento('passage', self.global_time + service_time, queue_source=queue_name, queue_destiny=next_queue)
         
-        return results
-    
-    def _validate_model(self):
-        # Verificar se todas as filas referenciadas existem
-        for route in self.loader.network:
-            if route.source not in self.queues and route.source != "exit":
-                raise ValueError(f"Fila de origem inválida: {route.source}")
-            if route.target not in self.queues and route.target != "exit":
-                raise ValueError(f"Fila de destino inválida: {route.target}")
-        
-        # Verificar se todas as filas têm rotas definidas
-        for queue_name in self.queues:
-            total_prob = sum(route.probability for route in self.loader.network if route.source == queue_name)
-            if abs(total_prob - 1.0) > 0.0001:
-                raise ValueError(f"Soma das probabilidades para a fila {queue_name} é {total_prob}, deveria ser 1.0")
+        self.insert_event(event)
+
+    def arrival(self, queue_name, time):
+        self.update_queues_time(time)
+        queue = self.queues[queue_name]
+
+        if queue.capacity == 0 or queue.population < queue.capacity:
+            queue.population += 1
+            if queue.population <= queue.num_servers:
+                self.schedule_service(queue_name)
+        else:
+            queue.loss += 1
+
+        next_arrival_time = self.global_time + self.random_between(self.min_arrival, self.max_arrival)
+        self.insert_event(Evento('arrival', next_arrival_time, queue_destiny=self.initial_queue))
+
+    def exit(self, event):
+        self.update_queues_time(event.time)
+        queue = self.queues[event.queue_source]
+        queue.population -= 1
+        if queue.population >= queue.num_servers:
+            self.schedule_service(event.queue_source)
+
+    def passage(self, event):
+        self.update_queues_time(event.time)
+        source_queue = self.queues[event.queue_source]
+        dest_queue = self.queues[event.queue_destiny]
+
+        source_queue.population -= 1
+        if source_queue.population >= source_queue.num_servers:
+            self.schedule_service(event.queue_source)
+
+        if dest_queue.capacity == 0 or dest_queue.population < dest_queue.capacity:
+            dest_queue.population += 1
+            if dest_queue.population <= dest_queue.num_servers:
+                self.schedule_service(event.queue_destiny)
+        else:
+            dest_queue.loss += 1
+
+    def run(self):
+        self.insert_event(Evento('arrival', self.initial_arrival_time, queue_destiny=self.initial_queue))
+
+        while self.iterations > 0 and self.scheduler:
+            event = self.scheduler.pop(0)
+            if event.event_type == 'arrival':
+                self.arrival(event.queue_destiny, event.time)
+            elif event.event_type == 'exit':
+                self.exit(event)
+            elif event.event_type == 'passage':
+                self.passage(event)
+
+    def print_results(self):
+        for queue_name, queue in self.queues.items():
+            print('*' * 40)
+            print(f'Queue {queue_name}: (G/G/{queue.num_servers}/{queue.capacity if queue.capacity > 0 else "∞"})')
+            print(f'Service time: {queue.min_service} - {queue.max_service}')
+            print('Transitions:')
+            for dest, prob in queue.transitions.items():
+                print(f'  {dest}: {prob:.2f}')
+            print('-' * 40)
+            print(f'{"State":<10}{"Times":<15}{"Probability":<15}')
+            total_time = sum(queue.times.values())
+            for state in sorted(queue.times.keys()):
+                time = queue.times[state]
+                prob = time / total_time if total_time > 0 else 0
+                print(f'{state:<10}{time:<15.4f}{prob:.2%}')
+            print(f'\nNumber of losses: {queue.loss}')
+
+        print('=' * 40)
+        print(f'Simulation time: {self.global_time:.2f}')
+        print('=' * 40)

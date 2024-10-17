@@ -1,55 +1,29 @@
-arrivals:
-  Q1: 2.0
+initial_queue: "queue1"
+initial_arrival_time: 2.0
+arrival_time: [2, 4]
 
 queues:
-  Q1:
+  queue1:
+    service_time: [1, 2]
     servers: 1
-    minService: 1.0
-    maxService: 2.0
-  Q2:
+    capacity: 0
+    transitions:
+      queue2: 0.8
+      queue3: 0.2
+
+  queue2:
+    service_time: [4, 8]
     servers: 2
     capacity: 5
-    minService: 4.0
-    maxService: 8.0
-  Q3:
+    transitions:
+      queue1: 0.3
+      queue2: 0.5
+      exit: 0.2
+
+  queue3:
+    service_time: [5, 15]
     servers: 2
     capacity: 10
-    minService: 5.0
-    maxService: 15.0
-
-network:
-  - source: Q1
-    target: Q2
-    probability: 0.8
-  - source: Q1
-    target: Q3
-    probability: 0.2
-  - source: Q2
-    target: Q1
-    probability: 0.3
-  - source: Q2
-    target: Q2
-    probability: 0.5
-  - source: Q2
-    target: exit
-    probability: 0.2
-  - source: Q3
-    target: Q3
-    probability: 0.7
-  - source: Q3
-    target: exit
-    probability: 0.3
-
-rndnumbers:
-  # Aqui se coloca os 100.000 números aleatórios
-  - 0.2176
-  - 0.0103
-  - 0.9299
-  - 0.3223
-  - 0.6498
-  - 0.8359
-  - 0.6557
-  - 0.5453
-  - 0.3197
-  - 0.1115
-  
+    transitions:
+      queue3: 0.7
+      exit: 0.3
